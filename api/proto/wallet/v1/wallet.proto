@@ -1,0 +1,45 @@
+// api/proto/wallet/v1/wallet.proto
+syntax = "proto3";
+
+package wallet.v1;
+
+option go_package = "github.com/Sushiiis/T-Wallet/api/proto/wallet/v1;walletv1";
+
+service WalletService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc CreateAccount(CreateAccountRequest) returns (Account);
+  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse);
+  rpc Deposit(DepositRequest) returns (TransactionResponse);
+  rpc Withdraw(WithdrawRequest) returns (TransactionResponse);
+  rpc Transfer(TransferRequest) returns (TransactionResponse);
+}
+
+message RegisterRequest  { string email = 1; string password = 2; }
+message RegisterResponse { string user_id = 1; }
+
+message LoginRequest  { string email = 1; string password = 2; }
+message LoginResponse { string access_token = 1; }
+
+message CreateAccountRequest { string currency = 1; }
+
+message Account {
+  string id = 1;
+  string user_id = 2;
+  string currency = 3;
+  int64  balance = 4; // в копейках
+}
+
+message GetBalanceRequest { string account_id = 1; }
+message BalanceResponse   { string account_id = 1; int64 balance = 2; string currency = 3; }
+
+message DepositRequest  { string account_id = 1; int64 amount = 2; }
+message WithdrawRequest { string account_id = 1; int64 amount = 2; }
+message TransferRequest { string from_account_id = 1; string to_account_id = 2; int64 amount = 3; }
+
+message TransactionResponse {
+  string transaction_id = 1;
+  string type = 2;
+  string status = 3;
+  int64  amount = 4;
+}

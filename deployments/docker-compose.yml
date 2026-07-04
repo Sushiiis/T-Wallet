@@ -1,0 +1,21 @@
+# deployments/docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: twallet-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-twallet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twallet_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-twallet}
+    ports:
+      - "5432:5432"
+    volumes:
+      - twallet-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-twallet} -d ${POSTGRES_DB:-twallet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  twallet-pg-data:
