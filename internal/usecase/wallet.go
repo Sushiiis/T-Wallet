@@ -1,4 +1,3 @@
-// internal/usecase/wallet.go
 package usecase
 
 import (
