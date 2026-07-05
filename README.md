@@ -10,7 +10,7 @@ Go, PostgreSQL (pgx v5), gRPC, grpc-gateway, JWT (HS256), bcrypt.
 
 ## Архитектура
 
-\`\`\`mermaid
+​```mermaid
 graph LR
     Client -->|REST/JSON| Gateway[grpc-gateway]
     Client -->|gRPC| GRPC[gRPC Server]
@@ -25,7 +25,7 @@ graph LR
     GRPC -.трейсы.-> Jaeger
     GRPC -.метрики.-> Prometheus
     Prometheus --> Grafana
-\`\`\`
+​```
 
 ## Запуск локально
 
