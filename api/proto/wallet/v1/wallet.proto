@@ -3,16 +3,58 @@ syntax = "proto3";
 
 package wallet.v1;
 
+import "google/api/annotations.proto";
+
 option go_package = "github.com/Sushiiis/T-Wallet/api/proto/wallet/v1;walletv1";
 
 service WalletService {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc Login(LoginRequest) returns (LoginResponse);
-  rpc CreateAccount(CreateAccountRequest) returns (Account);
-  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse);
-  rpc Deposit(DepositRequest) returns (TransactionResponse);
-  rpc Withdraw(WithdrawRequest) returns (TransactionResponse);
-  rpc Transfer(TransferRequest) returns (TransactionResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc CreateAccount(CreateAccountRequest) returns (Account) {
+    option (google.api.http) = {
+      post: "/v1/accounts"
+      body: "*"
+    };
+  }
+
+  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse) {
+    option (google.api.http) = {
+      get: "/v1/accounts/{account_id}/balance"
+    };
+  }
+
+  rpc Deposit(DepositRequest) returns (TransactionResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{account_id}/deposit"
+      body: "*"
+    };
+  }
+
+  rpc Withdraw(WithdrawRequest) returns (TransactionResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{account_id}/withdraw"
+      body: "*"
+    };
+  }
+
+  rpc Transfer(TransferRequest) returns (TransactionResponse) {
+    option (google.api.http) = {
+      post: "/v1/transfers"
+      body: "*"
+    };
+  }
 }
 
 message RegisterRequest  { string email = 1; string password = 2; }
@@ -27,7 +69,7 @@ message Account {
   string id = 1;
   string user_id = 2;
   string currency = 3;
-  int64  balance = 4; // в копейках
+  int64  balance = 4;
 }
 
 message GetBalanceRequest { string account_id = 1; }

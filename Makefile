@@ -11,13 +11,16 @@ MIGRATE_DSN := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST)
 
 test-integration:
 	go test -tags=integration ./... -v
-	
+
 proto:
 	protoc \
-	  --proto_path=api/proto \
+	  --proto_path=api/proto --proto_path=third_party \
 	  --go_out=. --go_opt=module=github.com/Sushiiis/T-Wallet \
 	  --go-grpc_out=. --go-grpc_opt=module=github.com/Sushiiis/T-Wallet \
+	  --grpc-gateway_out=api/proto --grpc-gateway_opt=paths=source_relative \
+	  --openapiv2_out=api/proto --openapiv2_opt=paths=source_relative \
 	  api/proto/wallet/v1/wallet.proto
+
 
 test:
 	go test ./...

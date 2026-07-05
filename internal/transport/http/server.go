@@ -9,17 +9,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// New строит HTTP-сервер с пробами liveness/readiness.
-func New(addr string, pool *pgxpool.Pool) *http.Server {
+// New строит HTTP-сервер: liveness/readiness напрямую, всё остальное — в REST-шлюз.
+func New(ctx context.Context, addr string, pool *pgxpool.Pool, grpcEndpoint string) (*http.Server, error) {
+	gateway, err := NewGatewayMux(ctx, grpcEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
 	mux := http.NewServeMux()
 
-	// Liveness: процесс жив.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	// Readiness: зависимости (Postgres) доступны.
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
@@ -31,9 +34,12 @@ func New(addr string, pool *pgxpool.Pool) *http.Server {
 		_, _ = w.Write([]byte("ready"))
 	})
 
+	// Всё остальное (/v1/...) — в grpc-gateway.
+	mux.Handle("/v1/", gateway)
+
 	return &http.Server{
 		Addr:              addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
-	}
+	}, nil
 }

@@ -57,7 +57,10 @@ func run(logger *slog.Logger) error {
 	handler := grpcserver.NewWalletHandler(uc)
 
 	grpcSrv := grpcserver.New(handler, tokens)
-	httpSrv := httpserver.New(":"+cfg.HTTP.Port, pool)
+	httpSrv, err := httpserver.New(ctx, ":"+cfg.HTTP.Port, pool, "localhost:"+cfg.GRPC.Port)
+	if err != nil {
+		return fmt.Errorf("build http server: %w", err)
+	}
 
 	lis, err := net.Listen("tcp", ":"+cfg.GRPC.Port)
 	if err != nil {
