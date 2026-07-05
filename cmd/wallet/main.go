@@ -16,6 +16,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/Sushiiis/T-Wallet/internal/auth"
 	"github.com/Sushiiis/T-Wallet/internal/config"
 	"github.com/Sushiiis/T-Wallet/internal/kafka/producer"
@@ -25,7 +27,6 @@ import (
 	grpcserver "github.com/Sushiiis/T-Wallet/internal/transport/grpc"
 	httpserver "github.com/Sushiiis/T-Wallet/internal/transport/http"
 	"github.com/Sushiiis/T-Wallet/internal/usecase"
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -49,19 +50,8 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("конфиг загружен", "env", cfg.Env)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		relay.Run(ctx)
-	}()
-
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
-	defer rdb.Close()
-	limiter := ratelimit.New(rdb, 10, time.Minute) // 10 денежных операций в минуту на пользователя
-
-	grpcSrv := grpcserver.New(handler, tokens, limiter)
-
+	// Трейсинг — инициализируем как можно раньше, чтобы спаны были доступны
+	// уже во время построения остальных зависимостей.
 	shutdownTracer, err := observability.InitTracer(ctx, cfg.Observability.OTLPEndpoint, cfg.Observability.ServiceName)
 	if err != nil {
 		return fmt.Errorf("init tracer: %w", err)
@@ -77,9 +67,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
-	wg.Wait() // дождаться, пока relay корректно остановится после отмены ctx
 	logger.Info("подключение к postgres установлено")
 
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	defer rdb.Close()
+	limiter := ratelimit.New(rdb, 10, time.Minute) // 10 денежных операций в минуту на пользователя
 
 	// Слои: репозитории -> usecase -> транспорт.
 	userRepo := postgres.NewUserRepo(pool)
@@ -88,14 +80,19 @@ func run(logger *slog.Logger) error {
 	uc := usecase.NewWallet(userRepo, walletRepo, tokens)
 	handler := grpcserver.NewWalletHandler(uc)
 
-	relay := producer.NewRelay(pool, cfg.Kafka.Brokers, cfg.Kafka.Topic, cfg.Kafka.RelayInterval, logger)
-	go relay.Run(ctx)
-
-	grpcSrv := grpcserver.New(handler, tokens)
+	grpcSrv := grpcserver.New(handler, tokens, limiter)
 	httpSrv, err := httpserver.New(ctx, ":"+cfg.HTTP.Port, pool, "localhost:"+cfg.GRPC.Port)
 	if err != nil {
 		return fmt.Errorf("build http server: %w", err)
 	}
+
+	relay := producer.NewRelay(pool, cfg.Kafka.Brokers, cfg.Kafka.Topic, cfg.Kafka.RelayInterval, logger)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relay.Run(ctx)
+	}()
 
 	lis, err := net.Listen("tcp", ":"+cfg.GRPC.Port)
 	if err != nil {
@@ -145,6 +142,7 @@ func run(logger *slog.Logger) error {
 		grpcSrv.Stop()
 	}
 
+	wg.Wait() // дождаться, пока relay корректно остановится после отмены ctx
 	logger.Info("остановка завершена")
 	return nil
 }

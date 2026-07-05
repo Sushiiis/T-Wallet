@@ -1,3 +1,4 @@
+// internal/config/config.go
 package config
 
 import (
@@ -8,14 +9,15 @@ import (
 )
 
 type Config struct {
-	Env      		string
-	GRPC     		GRPCConfig
-	HTTP     		HTTPConfig
-	Postgres 		PostgresConfig
-	Shutdown 		time.Duration
-	JWT	 			JWTConfig
-	Kafka			KafkaConfig
-	Observability 	ObservabilityConfig
+	Env           string
+	GRPC          GRPCConfig
+	HTTP          HTTPConfig
+	Postgres      PostgresConfig
+	Shutdown      time.Duration
+	JWT           JWTConfig
+	Kafka         KafkaConfig
+	Observability ObservabilityConfig
+	Redis         RedisConfig
 }
 
 type GRPCConfig struct{ Port string }
@@ -30,16 +32,6 @@ type PostgresConfig struct {
 	SSLMode  string
 }
 
-type RedisConfig struct {
-	Addr string
-}
-
-type ObservabilityConfig struct {
-	OTLPEndpoint   string
-	ServiceName    string
-	TracingEnabled bool
-}
-
 type JWTConfig struct {
 	Secret string
 	TTL    time.Duration
@@ -50,6 +42,16 @@ type KafkaConfig struct {
 	Topic           string
 	ConsumerGroupID string
 	RelayInterval   time.Duration
+}
+
+type ObservabilityConfig struct {
+	OTLPEndpoint   string
+	ServiceName    string
+	TracingEnabled bool
+}
+
+type RedisConfig struct {
+	Addr string
 }
 
 // DSN собирает строку подключения к PostgreSQL в URL-формате.
@@ -84,7 +86,7 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 		},
 		Shutdown: getEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
-				JWT: JWTConfig{
+		JWT: JWTConfig{
 			Secret: req("JWT_SECRET"),
 			TTL:    getEnvDuration("JWT_TTL", 15*time.Minute),
 		},
@@ -100,7 +102,7 @@ func Load() (*Config, error) {
 			TracingEnabled: getEnv("TRACING_ENABLED", "true") == "true",
 		},
 		Redis: RedisConfig{
-			Addr: getEnv("REDIS_ADDR", "localhost:6379")
+			Addr: getEnv("REDIS_ADDR", "localhost:6379"),
 		},
 	}
 

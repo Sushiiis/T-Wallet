@@ -11,12 +11,12 @@ import (
 
 	walletv1 "github.com/Sushiiis/T-Wallet/api/proto/wallet/v1"
 	"github.com/Sushiiis/T-Wallet/internal/auth"
+	"github.com/Sushiiis/T-Wallet/internal/ratelimit"
 )
 
-// New строит gRPC-сервер с трейсингом (otelgrpc.NewServerHandler — актуальный
-// stats.Handler API; interceptor-based otelgrpc.UnaryServerInterceptor удалён
-// из библиотеки), метриками, auth и health-check.
-func New(handler *WalletHandler, tokens *auth.Manager) *grpc.Server {
+// New строит gRPC-сервер с трейсингом, метриками, auth, rate limiting,
+// health-check и reflection.
+func New(handler *WalletHandler, tokens *auth.Manager, limiter *ratelimit.Limiter) *grpc.Server {
 	srv := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainUnaryInterceptor(
