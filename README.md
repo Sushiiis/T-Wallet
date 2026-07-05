@@ -112,7 +112,7 @@ curl -X POST http://localhost:8080/v1/transfers \
   -d '{"from_account_id":"'$ACC'","to_account_id":"'$OTHER'","amount":500}'
 ```
 
-## gRPC (для сравнения)
+## gRPC
 
 Reflection включён, `.proto` для клиента не нужен:
 ```bash
@@ -133,6 +133,17 @@ gRPC-коды маппятся в HTTP-статусы grpc-gateway по стан
 | Счёт/пользователь не найден | `NotFound` | 404 |
 | Email уже занят / повтор `Idempotency-Key` с другим телом | `AlreadyExists` | 409 |
 | Недостаточно средств | `FailedPrecondition` | 400 |
+
+## Kubernetes
+
+Манифесты в `deployments/k8s/` дают полную демонстрацию Deployment/Service/
+ConfigMap/Secret и трёх видов проб (liveness/readiness/startup) на локальном
+кластере `kind`. Инфраструктурные зависимости (Postgres/Kafka/Redis) в
+кластер сознательно не включены — в проде это managed-сервисы или
+отдельные Helm-чарты. Поэтому поды `t-wallet`/`t-wallet-notifier` при
+запуске в чистом `kind`-кластере без внешних зависимостей корректно уходят
+в `CrashLoopBackOff` — это ожидаемое поведение health-check'ов и graceful
+завершения при недоступности БД, а не дефект манифестов.
 
 ## OpenAPI-документация
 

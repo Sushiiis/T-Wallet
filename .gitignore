@@ -8,3 +8,5 @@
 .DS_Store
 .env
 .txt
+echo "deployments/k8s/secret.yaml"
+echo "deployments/k8s/secret.yaml" >> .gitignore

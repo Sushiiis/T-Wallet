@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: t-wallet-config
+data:
+  APP_ENV: "production"
+  GRPC_PORT: "50051"
+  HTTP_PORT: "8080"
+  SHUTDOWN_TIMEOUT: "10s"
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "twallet"
+  POSTGRES_SSLMODE: "disable"
+  JWT_TTL: "15m"
+  KAFKA_BROKERS: "kafka:9092"
+  KAFKA_TOPIC: "wallet.transactions.completed"
+  KAFKA_CONSUMER_GROUP: "notifier"
+  KAFKA_RELAY_INTERVAL: "500ms"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4317"
+  OTEL_SERVICE_NAME: "t-wallet"
+  TRACING_ENABLED: "true"
+  REDIS_ADDR: "redis:6379"

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: t-wallet-notifier
+  labels:
+    app: t-wallet-notifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: t-wallet-notifier
+  template:
+    metadata:
+      labels:
+        app: t-wallet-notifier
+    spec:
+      containers:
+        - name: notifier
+          image: t-wallet:latest
+          imagePullPolicy: Never
+          command: ["/notifier"]
+          envFrom:
+            - configMapRef:
+                name: t-wallet-config
+            - secretRef:
+                name: t-wallet-secrets
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          livenessProbe:
+            exec:
+              command: ["pgrep", "notifier"]
+            initialDelaySeconds: 5
+            periodSeconds: 15
