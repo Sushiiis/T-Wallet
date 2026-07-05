@@ -9,6 +9,7 @@
 package walletv1
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -264,7 +265,7 @@ type Account struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
-	Balance       int64                  `protobuf:"varint,4,opt,name=balance,proto3" json:"balance,omitempty"` // в копейках
+	Balance       int64                  `protobuf:"varint,4,opt,name=balance,proto3" json:"balance,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -667,7 +668,7 @@ var File_wallet_v1_wallet_proto protoreflect.FileDescriptor
 
 const file_wallet_v1_wallet_proto_rawDesc = "" +
 	"\n" +
-	"\x16wallet/v1/wallet.proto\x12\twallet.v1\"C\n" +
+	"\x16wallet/v1/wallet.proto\x12\twallet.v1\x1a\x1cgoogle/api/annotations.proto\"C\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"+\n" +
@@ -709,16 +710,16 @@ const file_wallet_v1_wallet_proto_rawDesc = "" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x16\n" +
-	"\x06amount\x18\x04 \x01(\x03R\x06amount2\xf4\x03\n" +
-	"\rWalletService\x12C\n" +
-	"\bRegister\x12\x1a.wallet.v1.RegisterRequest\x1a\x1b.wallet.v1.RegisterResponse\x12:\n" +
-	"\x05Login\x12\x17.wallet.v1.LoginRequest\x1a\x18.wallet.v1.LoginResponse\x12D\n" +
-	"\rCreateAccount\x12\x1f.wallet.v1.CreateAccountRequest\x1a\x12.wallet.v1.Account\x12F\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount2\xe8\x05\n" +
+	"\rWalletService\x12a\n" +
+	"\bRegister\x12\x1a.wallet.v1.RegisterRequest\x1a\x1b.wallet.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12U\n" +
+	"\x05Login\x12\x17.wallet.v1.LoginRequest\x1a\x18.wallet.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12]\n" +
+	"\rCreateAccount\x12\x1f.wallet.v1.CreateAccountRequest\x1a\x12.wallet.v1.Account\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/accounts\x12q\n" +
 	"\n" +
-	"GetBalance\x12\x1c.wallet.v1.GetBalanceRequest\x1a\x1a.wallet.v1.BalanceResponse\x12D\n" +
-	"\aDeposit\x12\x19.wallet.v1.DepositRequest\x1a\x1e.wallet.v1.TransactionResponse\x12F\n" +
-	"\bWithdraw\x12\x1a.wallet.v1.WithdrawRequest\x1a\x1e.wallet.v1.TransactionResponse\x12F\n" +
-	"\bTransfer\x12\x1a.wallet.v1.TransferRequest\x1a\x1e.wallet.v1.TransactionResponseB;Z9github.com/Sushiiis/T-Wallet/api/proto/wallet/v1;walletv1b\x06proto3"
+	"GetBalance\x12\x1c.wallet.v1.GetBalanceRequest\x1a\x1a.wallet.v1.BalanceResponse\")\x82\xd3\xe4\x93\x02#\x12!/v1/accounts/{account_id}/balance\x12r\n" +
+	"\aDeposit\x12\x19.wallet.v1.DepositRequest\x1a\x1e.wallet.v1.TransactionResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/accounts/{account_id}/deposit\x12u\n" +
+	"\bWithdraw\x12\x1a.wallet.v1.WithdrawRequest\x1a\x1e.wallet.v1.TransactionResponse\"-\x82\xd3\xe4\x93\x02':\x01*\"\"/v1/accounts/{account_id}/withdraw\x12`\n" +
+	"\bTransfer\x12\x1a.wallet.v1.TransferRequest\x1a\x1e.wallet.v1.TransactionResponse\"\x18\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/v1/transfersB;Z9github.com/Sushiiis/T-Wallet/api/proto/wallet/v1;walletv1b\x06proto3"
 
 var (
 	file_wallet_v1_wallet_proto_rawDescOnce sync.Once
