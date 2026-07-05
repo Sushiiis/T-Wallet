@@ -20,12 +20,12 @@ proto:
 	  --grpc-gateway_out=api/proto --grpc-gateway_opt=paths=source_relative \
 	  --openapiv2_out=api/proto \
 	  api/proto/wallet/v1/wallet.proto
-	  
+
 test:
 	go test ./...
 
 up:
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --wait
 
 down:
 	$(COMPOSE) down

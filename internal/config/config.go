@@ -14,6 +14,7 @@ type Config struct {
 	Postgres PostgresConfig
 	Shutdown time.Duration
 	JWT	 		JWTConfig
+	Kafka KafkaConfig
 }
 
 type GRPCConfig struct{ Port string }
@@ -31,6 +32,13 @@ type PostgresConfig struct {
 type JWTConfig struct {
 	Secret string
 	TTL    time.Duration
+}
+
+type KafkaConfig struct {
+	Brokers         []string
+	Topic           string
+	ConsumerGroupID string
+	RelayInterval   time.Duration
 }
 
 // DSN собирает строку подключения к PostgreSQL в URL-формате.
@@ -68,6 +76,12 @@ func Load() (*Config, error) {
 				JWT: JWTConfig{
 			Secret: req("JWT_SECRET"),
 			TTL:    getEnvDuration("JWT_TTL", 15*time.Minute),
+		},
+		Kafka: KafkaConfig{
+			Brokers:         strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","),
+			Topic:           getEnv("KAFKA_TOPIC", "wallet.transactions.completed"),
+			ConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP", "notifier"),
+			RelayInterval:   getEnvDuration("KAFKA_RELAY_INTERVAL", 500*time.Millisecond),
 		},
 	}
 

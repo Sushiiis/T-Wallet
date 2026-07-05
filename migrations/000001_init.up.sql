@@ -49,6 +49,7 @@ CREATE TABLE outbox (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+
 CREATE INDEX idx_accounts_user_id           ON accounts(user_id);
 CREATE INDEX idx_ledger_entries_account_id  ON ledger_entries(account_id);
 CREATE INDEX idx_transactions_from_account  ON transactions(from_account_id);

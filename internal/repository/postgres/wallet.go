@@ -4,8 +4,10 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -118,6 +120,9 @@ func (r *WalletRepo) singleEntry(
 	if err := attachIdempotencyKey(ctx, tx, idempotencyKey, txn.ID); err != nil {
 		return domain.Transaction{}, err
 	}
+	if err := insertOutboxEvent(ctx, tx, txn); err != nil {
+		return domain.Transaction{}, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Transaction{}, fmt.Errorf("commit: %w", err)
@@ -188,11 +193,43 @@ func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amoun
 	if err := attachIdempotencyKey(ctx, tx, idempotencyKey, txn.ID); err != nil {
 		return domain.Transaction{}, err
 	}
+	if err := insertOutboxEvent(ctx, tx, txn); err != nil {
+		return domain.Transaction{}, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Transaction{}, fmt.Errorf("commit: %w", err)
 	}
 	return txn, nil
+}
+
+func insertOutboxEvent(ctx context.Context, tx pgx.Tx, txn domain.Transaction) error {
+	event := struct {
+		TransactionID string     `json:"transaction_id"`
+		Type          string     `json:"type"`
+		Status        string     `json:"status"`
+		Amount        int64      `json:"amount"`
+		FromAccountID *uuid.UUID `json:"from_account_id,omitempty"`
+		ToAccountID   *uuid.UUID `json:"to_account_id,omitempty"`
+		CreatedAt     time.Time  `json:"created_at"`
+	}{
+		TransactionID: txn.ID.String(),
+		Type:          string(txn.Type),
+		Status:        txn.Status,
+		Amount:        txn.Amount,
+		FromAccountID: txn.FromAccountID,
+		ToAccountID:   txn.ToAccountID,
+		CreatedAt:     txn.CreatedAt,
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal outbox event: %w", err)
+	}
+	const q = `INSERT INTO outbox (topic, payload) VALUES ($1, $2)`
+	if _, err := tx.Exec(ctx, q, "wallet.transactions.completed", payload); err != nil {
+		return fmt.Errorf("insert outbox: %w", err)
+	}
+	return nil
 }
 
 // claimIdempotencyKey атомарно "застолбляет" ключ внутри транзакции.

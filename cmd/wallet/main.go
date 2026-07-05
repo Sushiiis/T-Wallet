@@ -16,6 +16,7 @@ import (
 
 	"github.com/Sushiiis/T-Wallet/internal/auth"
 	"github.com/Sushiiis/T-Wallet/internal/config"
+	"github.com/Sushiiis/T-Wallet/internal/kafka/producer"
 	"github.com/Sushiiis/T-Wallet/internal/repository/postgres"
 	grpcserver "github.com/Sushiiis/T-Wallet/internal/transport/grpc"
 	httpserver "github.com/Sushiiis/T-Wallet/internal/transport/http"
@@ -55,6 +56,9 @@ func run(logger *slog.Logger) error {
 	tokens := auth.NewManager(cfg.JWT.Secret, cfg.JWT.TTL)
 	uc := usecase.NewWallet(userRepo, walletRepo, tokens)
 	handler := grpcserver.NewWalletHandler(uc)
+
+	relay := producer.NewRelay(pool, cfg.Kafka.Brokers, cfg.Kafka.Topic, cfg.Kafka.RelayInterval, logger)
+	go relay.Run(ctx)
 
 	grpcSrv := grpcserver.New(handler, tokens)
 	httpSrv, err := httpserver.New(ctx, ":"+cfg.HTTP.Port, pool, "localhost:"+cfg.GRPC.Port)
