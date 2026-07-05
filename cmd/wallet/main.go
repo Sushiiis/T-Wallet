@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 
 	"github.com/Sushiiis/T-Wallet/internal/auth"
 	"github.com/Sushiiis/T-Wallet/internal/config"
 	"github.com/Sushiiis/T-Wallet/internal/kafka/producer"
+	"github.com/Sushiiis/T-Wallet/internal/observability"
 	"github.com/Sushiiis/T-Wallet/internal/repository/postgres"
 	grpcserver "github.com/Sushiiis/T-Wallet/internal/transport/grpc"
 	httpserver "github.com/Sushiiis/T-Wallet/internal/transport/http"
@@ -24,7 +26,8 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	base := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(observability.TraceHandler{Handler: base})
 	slog.SetDefault(logger)
 
 	if err := run(logger); err != nil {
@@ -42,6 +45,16 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	logger.Info("конфиг загружен", "env", cfg.Env)
+
+	shutdownTracer, err := observability.InitTracer(ctx, cfg.Observability.OTLPEndpoint, cfg.Observability.ServiceName)
+	if err != nil {
+		return fmt.Errorf("init tracer: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracer(shutdownCtx)
+	}()
 
 	pool, err := postgres.New(ctx, cfg.Postgres.DSN())
 	if err != nil {

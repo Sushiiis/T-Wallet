@@ -1,0 +1,8 @@
+# observability/grafana/provisioning/dashboards/dashboard.yml
+apiVersion: 1
+providers:
+  - name: default
+    folder: T-Wallet
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards

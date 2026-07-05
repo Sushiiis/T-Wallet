@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	Env      string
-	GRPC     GRPCConfig
-	HTTP     HTTPConfig
-	Postgres PostgresConfig
-	Shutdown time.Duration
-	JWT	 		JWTConfig
-	Kafka KafkaConfig
+	Env      		string
+	GRPC     		GRPCConfig
+	HTTP     		HTTPConfig
+	Postgres 		PostgresConfig
+	Shutdown 		time.Duration
+	JWT	 			JWTConfig
+	Kafka			KafkaConfig
+	Observability 	ObservabilityConfig
 }
 
 type GRPCConfig struct{ Port string }
@@ -27,6 +28,12 @@ type PostgresConfig struct {
 	Password string
 	DB       string
 	SSLMode  string
+}
+
+type ObservabilityConfig struct {
+	OTLPEndpoint   string
+	ServiceName    string
+	TracingEnabled bool
 }
 
 type JWTConfig struct {
@@ -82,6 +89,11 @@ func Load() (*Config, error) {
 			Topic:           getEnv("KAFKA_TOPIC", "wallet.transactions.completed"),
 			ConsumerGroupID: getEnv("KAFKA_CONSUMER_GROUP", "notifier"),
 			RelayInterval:   getEnvDuration("KAFKA_RELAY_INTERVAL", 500*time.Millisecond),
+		},
+		Observability: ObservabilityConfig{
+			OTLPEndpoint:   getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+			ServiceName:    getEnv("OTEL_SERVICE_NAME", "t-wallet"),
+			TracingEnabled: getEnv("TRACING_ENABLED", "true") == "true",
 		},
 	}
 

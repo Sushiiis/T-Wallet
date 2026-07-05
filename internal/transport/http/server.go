@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // New строит HTTP-сервер: liveness/readiness напрямую, всё остальное — в REST-шлюз.
@@ -22,6 +23,8 @@ func New(ctx context.Context, addr string, pool *pgxpool.Pool, grpcEndpoint stri
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
