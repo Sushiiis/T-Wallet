@@ -1,0 +1,52 @@
+stages:
+  - lint
+  - test
+  - build
+
+variables:
+  GOPATH: "$CI_PROJECT_DIR/.go"
+
+default:
+  image: golang:1.24
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .go/pkg/mod/
+
+lint:
+  stage: lint
+  script:
+    - go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    - golangci-lint run ./...
+
+unit-test:
+  stage: test
+  script:
+    - go build ./...
+    - go test ./... -v
+
+integration-test:
+  stage: test
+  # Официальная конфигурация Docker-in-Docker для testcontainers-go в GitLab CI.
+  services:
+    - name: docker:dind
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_RYUK_DISABLED: "false"
+  script:
+    - go test -tags=integration ./... -v
+
+build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build -t t-wallet:$CI_COMMIT_SHORT_SHA .
+  only:
+    - main

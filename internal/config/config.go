@@ -30,6 +30,10 @@ type PostgresConfig struct {
 	SSLMode  string
 }
 
+type RedisConfig struct {
+	Addr string
+}
+
 type ObservabilityConfig struct {
 	OTLPEndpoint   string
 	ServiceName    string
@@ -94,6 +98,9 @@ func Load() (*Config, error) {
 			OTLPEndpoint:   getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 			ServiceName:    getEnv("OTEL_SERVICE_NAME", "t-wallet"),
 			TracingEnabled: getEnv("TRACING_ENABLED", "true") == "true",
+		},
+		Redis: RedisConfig{
+			Addr: getEnv("REDIS_ADDR", "localhost:6379")
 		},
 	}
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,10 +20,12 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/config"
 	"github.com/Sushiiis/T-Wallet/internal/kafka/producer"
 	"github.com/Sushiiis/T-Wallet/internal/observability"
+	"github.com/Sushiiis/T-Wallet/internal/ratelimit"
 	"github.com/Sushiiis/T-Wallet/internal/repository/postgres"
 	grpcserver "github.com/Sushiiis/T-Wallet/internal/transport/grpc"
 	httpserver "github.com/Sushiiis/T-Wallet/internal/transport/http"
 	"github.com/Sushiiis/T-Wallet/internal/usecase"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -46,6 +49,19 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("конфиг загружен", "env", cfg.Env)
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relay.Run(ctx)
+	}()
+
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	defer rdb.Close()
+	limiter := ratelimit.New(rdb, 10, time.Minute) // 10 денежных операций в минуту на пользователя
+
+	grpcSrv := grpcserver.New(handler, tokens, limiter)
+
 	shutdownTracer, err := observability.InitTracer(ctx, cfg.Observability.OTLPEndpoint, cfg.Observability.ServiceName)
 	if err != nil {
 		return fmt.Errorf("init tracer: %w", err)
@@ -61,7 +77,9 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
+	wg.Wait() // дождаться, пока relay корректно остановится после отмены ctx
 	logger.Info("подключение к postgres установлено")
+
 
 	// Слои: репозитории -> usecase -> транспорт.
 	userRepo := postgres.NewUserRepo(pool)

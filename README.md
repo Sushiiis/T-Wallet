@@ -8,6 +8,25 @@
 Go, PostgreSQL (pgx v5), gRPC, grpc-gateway, JWT (HS256), bcrypt.
 Позднее добавятся: Kafka (transactional outbox), Redis, Prometheus, OpenTelemetry.
 
+## Архитектура
+
+\`\`\`mermaid
+graph LR
+    Client -->|REST/JSON| Gateway[grpc-gateway]
+    Client -->|gRPC| GRPC[gRPC Server]
+    Gateway --> GRPC
+    GRPC --> Usecase[Usecase layer]
+    Usecase --> Repo[(PostgreSQL)]
+    Usecase --> Redis[(Redis rate limit)]
+    Repo --> Outbox[outbox table]
+    Outbox -->|relay| Kafka[(Kafka)]
+    Kafka --> Notifier[notifier consumer]
+    Notifier --> Repo
+    GRPC -.трейсы.-> Jaeger
+    GRPC -.метрики.-> Prometheus
+    Prometheus --> Grafana
+\`\`\`
+
 ## Запуск локально
 
 Требования: Docker, Go 1.24+, `protoc` в PATH.

@@ -22,6 +22,7 @@ func New(handler *WalletHandler, tokens *auth.Manager) *grpc.Server {
 		grpc.ChainUnaryInterceptor(
 			NewMetricsInterceptor(),
 			NewAuthInterceptor(tokens),
+			NewRateLimitInterceptor(limiter),
 		),
 	)
 
