@@ -1,4 +1,4 @@
-// internal/usecase/wallet_test.go
+// internal/usecase/usecase_test.go
 package usecase_test
 
 import (
@@ -35,6 +35,7 @@ func (f *fakeUsers) GetByEmail(_ context.Context, email string) (domain.User, er
 type fakeWallet struct {
 	accounts       map[uuid.UUID]domain.Account
 	transferCalled bool
+	usedKeys       map[string]bool // имитирует БД-уникальность ключа
 }
 
 func (f *fakeWallet) CreateAccount(_ context.Context, userID uuid.UUID, cur string) (domain.Account, error) {
@@ -49,13 +50,17 @@ func (f *fakeWallet) GetAccount(_ context.Context, id uuid.UUID) (domain.Account
 	}
 	return a, nil
 }
-func (f *fakeWallet) Deposit(_ context.Context, _ uuid.UUID, amount int64) (domain.Transaction, error) {
+func (f *fakeWallet) Deposit(_ context.Context, _ uuid.UUID, amount int64, key, _ string) (domain.Transaction, error) {
+	if f.usedKeys[key] {
+		return domain.Transaction{ID: uuid.New(), Type: domain.TxDeposit, Amount: amount}, nil // имитация replay
+	}
+	f.usedKeys[key] = true
 	return domain.Transaction{ID: uuid.New(), Type: domain.TxDeposit, Amount: amount}, nil
 }
-func (f *fakeWallet) Withdraw(_ context.Context, _ uuid.UUID, amount int64) (domain.Transaction, error) {
+func (f *fakeWallet) Withdraw(_ context.Context, _ uuid.UUID, amount int64, _, _ string) (domain.Transaction, error) {
 	return domain.Transaction{ID: uuid.New(), Type: domain.TxWithdraw, Amount: amount}, nil
 }
-func (f *fakeWallet) Transfer(_ context.Context, _, _ uuid.UUID, amount int64) (domain.Transaction, error) {
+func (f *fakeWallet) Transfer(_ context.Context, _, _ uuid.UUID, amount int64, _, _ string) (domain.Transaction, error) {
 	f.transferCalled = true
 	return domain.Transaction{ID: uuid.New(), Type: domain.TxTransfer, Amount: amount}, nil
 }
@@ -66,7 +71,7 @@ func (fakeTokens) Generate(id uuid.UUID) (string, error) { return "token-" + id.
 
 func newWallet() (*usecase.Wallet, *fakeWallet) {
 	users := &fakeUsers{byEmail: map[string]domain.User{}}
-	wallet := &fakeWallet{accounts: map[uuid.UUID]domain.Account{}}
+	wallet := &fakeWallet{accounts: map[uuid.UUID]domain.Account{}, usedKeys: map[string]bool{}}
 	return usecase.NewWallet(users, wallet, fakeTokens{}), wallet
 }
 
@@ -97,7 +102,7 @@ func TestTransfer_SameAccount(t *testing.T) {
 	userID := uuid.New()
 	acc, _ := wallet.CreateAccount(context.Background(), userID, "RUB")
 	ctx := auth.ContextWithUserID(context.Background(), userID)
-	_, err := uc.Transfer(ctx, acc.ID, acc.ID, 100)
+	_, err := uc.Transfer(ctx, acc.ID, acc.ID, 100, "key-1")
 	require.ErrorIs(t, err, domain.ErrSameAccount)
 	require.False(t, wallet.transferCalled)
 }
@@ -106,8 +111,8 @@ func TestTransfer_NotOwner(t *testing.T) {
 	uc, wallet := newWallet()
 	acc, _ := wallet.CreateAccount(context.Background(), uuid.New(), "RUB")
 	dst, _ := wallet.CreateAccount(context.Background(), uuid.New(), "RUB")
-	ctx := auth.ContextWithUserID(context.Background(), uuid.New()) // чужой пользователь
-	_, err := uc.Transfer(ctx, acc.ID, dst.ID, 100)
+	ctx := auth.ContextWithUserID(context.Background(), uuid.New())
+	_, err := uc.Transfer(ctx, acc.ID, dst.ID, 100, "key-1")
 	require.ErrorIs(t, err, domain.ErrAccessDenied)
 }
 
@@ -116,6 +121,15 @@ func TestDeposit_InvalidAmount(t *testing.T) {
 	userID := uuid.New()
 	acc, _ := wallet.CreateAccount(context.Background(), userID, "RUB")
 	ctx := auth.ContextWithUserID(context.Background(), userID)
-	_, err := uc.Deposit(ctx, acc.ID, -50)
+	_, err := uc.Deposit(ctx, acc.ID, -50, "key-1")
 	require.ErrorIs(t, err, domain.ErrInvalidAmount)
+}
+
+func TestDeposit_MissingIdempotencyKey(t *testing.T) {
+	uc, wallet := newWallet()
+	userID := uuid.New()
+	acc, _ := wallet.CreateAccount(context.Background(), userID, "RUB")
+	ctx := auth.ContextWithUserID(context.Background(), userID)
+	_, err := uc.Deposit(ctx, acc.ID, 100, "")
+	require.ErrorIs(t, err, domain.ErrIdempotencyKeyRequired)
 }

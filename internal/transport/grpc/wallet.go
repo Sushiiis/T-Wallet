@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	walletv1 "github.com/Sushiiis/T-Wallet/api/proto/wallet/v1"
@@ -67,7 +68,11 @@ func (h *WalletHandler) Deposit(ctx context.Context, req *walletv1.DepositReques
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid account_id")
 	}
-	txn, err := h.uc.Deposit(ctx, id, req.GetAmount())
+	key, err := idempotencyKeyFromMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	txn, err := h.uc.Deposit(ctx, id, req.GetAmount(), key)
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -79,7 +84,11 @@ func (h *WalletHandler) Withdraw(ctx context.Context, req *walletv1.WithdrawRequ
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid account_id")
 	}
-	txn, err := h.uc.Withdraw(ctx, id, req.GetAmount())
+	key, err := idempotencyKeyFromMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	txn, err := h.uc.Withdraw(ctx, id, req.GetAmount(), key)
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -95,11 +104,29 @@ func (h *WalletHandler) Transfer(ctx context.Context, req *walletv1.TransferRequ
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid to_account_id")
 	}
-	txn, err := h.uc.Transfer(ctx, fromID, toID, req.GetAmount())
+	key, err := idempotencyKeyFromMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	txn, err := h.uc.Transfer(ctx, fromID, toID, req.GetAmount(), key)
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	return txnResponse(txn), nil
+}
+
+// idempotencyKeyFromMetadata читает заголовок "idempotency-key" из gRPC-метаданных.
+// gRPC автоматически приводит имена заголовков к нижнему регистру.
+func idempotencyKeyFromMetadata(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", status.Error(codes.InvalidArgument, "missing idempotency-key metadata")
+	}
+	values := md.Get("idempotency-key")
+	if len(values) == 0 || values[0] == "" {
+		return "", status.Error(codes.InvalidArgument, "missing idempotency-key metadata")
+	}
+	return values[0], nil
 }
 
 func txnResponse(t domain.Transaction) *walletv1.TransactionResponse {
@@ -109,11 +136,12 @@ func txnResponse(t domain.Transaction) *walletv1.TransactionResponse {
 	}
 }
 
-// toStatus маппит доменные ошибки на коды gRPC.
 func toStatus(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrUserAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, domain.ErrIdempotencyConflict):
+		return status.Error(codes.AlreadyExists, err.Error()) // grpc-gateway маппит на HTTP 409
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrAccessDenied):
@@ -122,7 +150,7 @@ func toStatus(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrInsufficientFunds):
 		return status.Error(codes.FailedPrecondition, err.Error())
-	case errors.Is(err, domain.ErrInvalidAmount), errors.Is(err, domain.ErrSameAccount):
+	case errors.Is(err, domain.ErrInvalidAmount), errors.Is(err, domain.ErrSameAccount), errors.Is(err, domain.ErrIdempotencyKeyRequired):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, "internal error")

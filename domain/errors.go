@@ -12,4 +12,6 @@ var (
 	ErrInsufficientFunds  = errors.New("insufficient funds")
 	ErrInvalidAmount      = errors.New("amount must be positive")
 	ErrSameAccount        = errors.New("cannot transfer to the same account")
+	ErrIdempotencyKeyRequired = errors.New("idempotency key is required")
+	ErrIdempotencyConflict    = errors.New("idempotency key used with a different request")
 )

@@ -52,26 +52,40 @@ func (r *WalletRepo) GetAccount(ctx context.Context, id uuid.UUID) (domain.Accou
 	return a, nil
 }
 
-func (r *WalletRepo) Deposit(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error) {
-	return r.singleEntry(ctx, domain.TxDeposit, accountID, amount, +amount)
+func (r *WalletRepo) Deposit(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey, requestHash string) (domain.Transaction, error) {
+	return r.singleEntry(ctx, domain.TxDeposit, accountID, amount, +amount, idempotencyKey, requestHash)
 }
 
-func (r *WalletRepo) Withdraw(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error) {
-	return r.singleEntry(ctx, domain.TxWithdraw, accountID, amount, -amount)
+func (r *WalletRepo) Withdraw(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey, requestHash string) (domain.Transaction, error) {
+	return r.singleEntry(ctx, domain.TxWithdraw, accountID, amount, -amount, idempotencyKey, requestHash)
 }
 
-// singleEntry — deposit/withdraw в одной транзакции с блокировкой строки счёта.
 func (r *WalletRepo) singleEntry(
 	ctx context.Context,
 	txType domain.TransactionType,
 	accountID uuid.UUID,
 	amount, delta int64,
+	idempotencyKey, reqHash string,
 ) (domain.Transaction, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return domain.Transaction{}, fmt.Errorf("begin: %w", err)
 	}
-	defer tx.Rollback(ctx) // no-op после успешного commit
+	defer tx.Rollback(ctx)
+
+	existingTxnID, err := claimIdempotencyKey(ctx, tx, idempotencyKey, reqHash)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	if existingTxnID != nil {
+		// Ключ уже был использован с тем же телом запроса — просто
+		// возвращаем результат прежней операции, ничего не выполняя повторно.
+		txn, err := getTransactionByID(ctx, tx, *existingTxnID)
+		if err != nil {
+			return domain.Transaction{}, err
+		}
+		return txn, tx.Commit(ctx)
+	}
 
 	balance, err := lockAccount(ctx, tx, accountID)
 	if err != nil {
@@ -101,6 +115,9 @@ func (r *WalletRepo) singleEntry(
 	if err := insertLedger(ctx, tx, txn.ID, accountID, delta); err != nil {
 		return domain.Transaction{}, err
 	}
+	if err := attachIdempotencyKey(ctx, tx, idempotencyKey, txn.ID); err != nil {
+		return domain.Transaction{}, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Transaction{}, fmt.Errorf("commit: %w", err)
@@ -108,15 +125,27 @@ func (r *WalletRepo) singleEntry(
 	return txn, nil
 }
 
-func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64) (domain.Transaction, error) {
+func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64, idempotencyKey, reqHash string) (domain.Transaction, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return domain.Transaction{}, fmt.Errorf("begin: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
+	existingTxnID, err := claimIdempotencyKey(ctx, tx, idempotencyKey, reqHash)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	if existingTxnID != nil {
+		txn, err := getTransactionByID(ctx, tx, *existingTxnID)
+		if err != nil {
+			return domain.Transaction{}, err
+		}
+		return txn, tx.Commit(ctx)
+	}
+
 	// Блокируем счета в детерминированном порядке (по возрастанию id),
-	// иначе переводы A->B и B->A могут поймать дедлок.
+	// чтобы переводы A->B и B->A не поймали дедлок.
 	firstID, secondID := fromID, toID
 	if bytes.Compare(fromID[:], toID[:]) > 0 {
 		firstID, secondID = toID, fromID
@@ -150,11 +179,13 @@ func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amoun
 	if err != nil {
 		return domain.Transaction{}, err
 	}
-	// Двойная запись: -amount с источника, +amount получателю.
 	if err := insertLedger(ctx, tx, txn.ID, fromID, -amount); err != nil {
 		return domain.Transaction{}, err
 	}
 	if err := insertLedger(ctx, tx, txn.ID, toID, +amount); err != nil {
+		return domain.Transaction{}, err
+	}
+	if err := attachIdempotencyKey(ctx, tx, idempotencyKey, txn.ID); err != nil {
 		return domain.Transaction{}, err
 	}
 
@@ -164,7 +195,75 @@ func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amoun
 	return txn, nil
 }
 
-// lockAccount берёт row-level блокировку (SELECT ... FOR UPDATE) и возвращает баланс.
+// claimIdempotencyKey атомарно "застолбляет" ключ внутри транзакции.
+//
+// Возвращает (nil, nil), если ключ свободен — вызывающий код должен выполнить операцию.
+// Возвращает (&transactionID, nil), если ключ уже использовался с тем же телом
+// запроса — вызывающий код должен вернуть результат прежней операции.
+// Возвращает (nil, domain.ErrIdempotencyConflict), если ключ использовался с
+// другим телом запроса.
+//
+// Безопасность при гонке: под Read Committed конкурентный INSERT с тем же
+// PRIMARY KEY блокируется до завершения первой транзакции. Если та закоммитилась,
+// наш INSERT ... ON CONFLICT DO NOTHING гарантированно видит уже закоммиченную
+// строку — поэтому последующий SELECT ниже никогда не увидит "чужую" гонку.
+func claimIdempotencyKey(ctx context.Context, tx pgx.Tx, key, reqHash string) (*uuid.UUID, error) {
+	tag, err := tx.Exec(ctx,
+		`INSERT INTO idempotency_keys (key, request_hash) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+		key, reqHash,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("claim idempotency key: %w", err)
+	}
+	if tag.RowsAffected() == 1 {
+		return nil, nil
+	}
+
+	var storedHash string
+	var existingTxnID *uuid.UUID
+	err = tx.QueryRow(ctx,
+		`SELECT request_hash, transaction_id FROM idempotency_keys WHERE key = $1`, key,
+	).Scan(&storedHash, &existingTxnID)
+	if err != nil {
+		return nil, fmt.Errorf("read idempotency key: %w", err)
+	}
+	if storedHash != reqHash {
+		return nil, domain.ErrIdempotencyConflict
+	}
+	if existingTxnID == nil {
+		// Практически недостижимо: transaction_id проставляется в той же
+		// транзакции, что и коммит claim'а. Оставлено как защита от гонки,
+		// которую мы не предусмотрели.
+		return nil, fmt.Errorf("idempotency key %q claimed but has no transaction yet, retry", key)
+	}
+	return existingTxnID, nil
+}
+
+// attachIdempotencyKey привязывает успешно выполненную операцию к её ключу.
+func attachIdempotencyKey(ctx context.Context, tx pgx.Tx, key string, txnID uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE idempotency_keys SET transaction_id = $1 WHERE key = $2`, txnID, key,
+	)
+	if err != nil {
+		return fmt.Errorf("attach idempotency key: %w", err)
+	}
+	return nil
+}
+
+func getTransactionByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (domain.Transaction, error) {
+	const q = `
+		SELECT id, type, status, amount, from_account_id, to_account_id, created_at
+		FROM transactions WHERE id = $1`
+
+	var t domain.Transaction
+	err := tx.QueryRow(ctx, q, id).
+		Scan(&t.ID, &t.Type, &t.Status, &t.Amount, &t.FromAccountID, &t.ToAccountID, &t.CreatedAt)
+	if err != nil {
+		return domain.Transaction{}, fmt.Errorf("get transaction by id: %w", err)
+	}
+	return t, nil
+}
+
 func lockAccount(ctx context.Context, tx pgx.Tx, id uuid.UUID) (int64, error) {
 	var balance int64
 	err := tx.QueryRow(ctx,

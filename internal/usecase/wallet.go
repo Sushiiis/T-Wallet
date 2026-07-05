@@ -1,8 +1,12 @@
+// internal/usecase/wallet.go
 package usecase
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -21,9 +25,9 @@ type UserRepository interface {
 type WalletRepository interface {
 	CreateAccount(ctx context.Context, userID uuid.UUID, currency string) (domain.Account, error)
 	GetAccount(ctx context.Context, id uuid.UUID) (domain.Account, error)
-	Deposit(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error)
-	Withdraw(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error)
-	Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64) (domain.Transaction, error)
+	Deposit(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey, requestHash string) (domain.Transaction, error)
+	Withdraw(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey, requestHash string) (domain.Transaction, error)
+	Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64, idempotencyKey, requestHash string) (domain.Transaction, error)
 }
 
 type TokenManager interface {
@@ -40,7 +44,6 @@ func NewWallet(users UserRepository, wallet WalletRepository, tokens TokenManage
 	return &Wallet{users: users, wallet: wallet, tokens: tokens}
 }
 
-// Register создаёт пользователя. Пароль хранится только как bcrypt-хеш.
 func (w *Wallet) Register(ctx context.Context, email, password string) (domain.User, error) {
 	if email == "" || len(password) < 6 {
 		return domain.User{}, domain.ErrInvalidCredentials
@@ -52,12 +55,11 @@ func (w *Wallet) Register(ctx context.Context, email, password string) (domain.U
 	return w.users.Create(ctx, email, string(hash))
 }
 
-// Login проверяет пароль и выдаёт JWT.
 func (w *Wallet) Login(ctx context.Context, email, password string) (string, error) {
 	user, err := w.users.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			return "", domain.ErrInvalidCredentials // не раскрываем, что юзера нет
+			return "", domain.ErrInvalidCredentials
 		}
 		return "", err
 	}
@@ -82,41 +84,51 @@ func (w *Wallet) GetBalance(ctx context.Context, accountID uuid.UUID) (domain.Ac
 	return w.ownedAccount(ctx, accountID)
 }
 
-func (w *Wallet) Deposit(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error) {
+func (w *Wallet) Deposit(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey string) (domain.Transaction, error) {
+	if idempotencyKey == "" {
+		return domain.Transaction{}, domain.ErrIdempotencyKeyRequired
+	}
 	if amount <= 0 {
 		return domain.Transaction{}, domain.ErrInvalidAmount
 	}
 	if _, err := w.ownedAccount(ctx, accountID); err != nil {
 		return domain.Transaction{}, err
 	}
-	return w.wallet.Deposit(ctx, accountID, amount)
+	hash := requestHash("deposit", accountID.String(), fmt.Sprint(amount))
+	return w.wallet.Deposit(ctx, accountID, amount, idempotencyKey, hash)
 }
 
-func (w *Wallet) Withdraw(ctx context.Context, accountID uuid.UUID, amount int64) (domain.Transaction, error) {
+func (w *Wallet) Withdraw(ctx context.Context, accountID uuid.UUID, amount int64, idempotencyKey string) (domain.Transaction, error) {
+	if idempotencyKey == "" {
+		return domain.Transaction{}, domain.ErrIdempotencyKeyRequired
+	}
 	if amount <= 0 {
 		return domain.Transaction{}, domain.ErrInvalidAmount
 	}
 	if _, err := w.ownedAccount(ctx, accountID); err != nil {
 		return domain.Transaction{}, err
 	}
-	return w.wallet.Withdraw(ctx, accountID, amount)
+	hash := requestHash("withdraw", accountID.String(), fmt.Sprint(amount))
+	return w.wallet.Withdraw(ctx, accountID, amount, idempotencyKey, hash)
 }
 
-func (w *Wallet) Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64) (domain.Transaction, error) {
+func (w *Wallet) Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64, idempotencyKey string) (domain.Transaction, error) {
+	if idempotencyKey == "" {
+		return domain.Transaction{}, domain.ErrIdempotencyKeyRequired
+	}
 	if amount <= 0 {
 		return domain.Transaction{}, domain.ErrInvalidAmount
 	}
 	if fromID == toID {
 		return domain.Transaction{}, domain.ErrSameAccount
 	}
-	// Проверяем владельца только для счёта-источника: получатель может быть чужим.
 	if _, err := w.ownedAccount(ctx, fromID); err != nil {
 		return domain.Transaction{}, err
 	}
-	return w.wallet.Transfer(ctx, fromID, toID, amount)
+	hash := requestHash("transfer", fromID.String(), toID.String(), fmt.Sprint(amount))
+	return w.wallet.Transfer(ctx, fromID, toID, amount, idempotencyKey, hash)
 }
 
-// ownedAccount загружает счёт и проверяет, что он принадлежит текущему пользователю.
 func (w *Wallet) ownedAccount(ctx context.Context, accountID uuid.UUID) (domain.Account, error) {
 	userID, ok := auth.UserIDFromContext(ctx)
 	if !ok {
@@ -130,4 +142,16 @@ func (w *Wallet) ownedAccount(ctx context.Context, accountID uuid.UUID) (domain.
 		return domain.Account{}, domain.ErrAccessDenied
 	}
 	return acc, nil
+}
+
+// requestHash — детерминированный отпечаток тела запроса. Используется, чтобы
+// отличить "тот же Idempotency-Key, тот же запрос" (безопасный повтор) от
+// "тот же ключ, но другое тело" (ошибка клиента, см. ТЗ п.6.1).
+func requestHash(parts ...string) string {
+	h := sha256.New()
+	for _, p := range parts {
+		h.Write([]byte(p))
+		h.Write([]byte{0}) // разделитель, чтобы "12"+"3" не совпало с "1"+"23"
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
