@@ -1,4 +1,3 @@
-// cmd/wallet/main.go
 package main
 
 import (
@@ -50,8 +49,7 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("конфиг загружен", "env", cfg.Env)
 
-	// Трейсинг — инициализируем как можно раньше, чтобы спаны были доступны
-	// уже во время построения остальных зависимостей.
+	// Трейсинг
 	shutdownTracer, err := observability.InitTracer(ctx, cfg.Observability.OTLPEndpoint, cfg.Observability.ServiceName)
 	if err != nil {
 		return fmt.Errorf("init tracer: %w", err)
@@ -73,7 +71,7 @@ func run(logger *slog.Logger) error {
 	defer rdb.Close()
 	limiter := ratelimit.New(rdb, 10, time.Minute) // 10 денежных операций в минуту на пользователя
 
-	// Слои: репозитории -> usecase -> транспорт.
+	// Слои: репозитории - usecase - транспорт.
 	userRepo := postgres.NewUserRepo(pool)
 	walletRepo := postgres.NewWalletRepo(pool)
 	tokens := auth.NewManager(cfg.JWT.Secret, cfg.JWT.TTL)
@@ -142,7 +140,7 @@ func run(logger *slog.Logger) error {
 		grpcSrv.Stop()
 	}
 
-	wg.Wait() // дождаться, пока relay корректно остановится после отмены ctx
+	wg.Wait()
 	logger.Info("остановка завершена")
 	return nil
 }

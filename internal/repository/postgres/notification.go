@@ -1,4 +1,3 @@
-// internal/repository/postgres/notification.go
 package postgres
 
 import (
@@ -17,9 +16,6 @@ func NewNotificationRepo(pool *pgxpool.Pool) *NotificationRepo {
 	return &NotificationRepo{pool: pool}
 }
 
-// Create идемпотентно записывает уведомление: повторная доставка того же
-// transaction_id (at-least-once от Kafka) не создаёт вторую запись.
-// Возвращает true, если запись была реально вставлена (не дубликат).
 func (r *NotificationRepo) Create(ctx context.Context, transactionID uuid.UUID, payload []byte) (bool, error) {
 	const q = `
 		INSERT INTO notifications (transaction_id, payload)

@@ -1,4 +1,3 @@
-// internal/transport/grpc/server.go
 package grpcserver
 
 import (
@@ -14,8 +13,7 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/ratelimit"
 )
 
-// New строит gRPC-сервер с трейсингом, метриками, auth, rate limiting,
-// health-check и reflection.
+// New строит gRPC-сервер с трейсингом, метриками, auth, rate limiting, health-check и reflection.
 func New(handler *WalletHandler, tokens *auth.Manager, limiter *ratelimit.Limiter) *grpc.Server {
 	srv := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),

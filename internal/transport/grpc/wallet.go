@@ -1,4 +1,3 @@
-// internal/transport/grpc/wallet.go
 package grpcserver
 
 import (
@@ -115,8 +114,6 @@ func (h *WalletHandler) Transfer(ctx context.Context, req *walletv1.TransferRequ
 	return txnResponse(txn), nil
 }
 
-// idempotencyKeyFromMetadata читает заголовок "idempotency-key" из gRPC-метаданных.
-// gRPC автоматически приводит имена заголовков к нижнему регистру.
 func idempotencyKeyFromMetadata(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -141,7 +138,7 @@ func toStatus(err error) error {
 	case errors.Is(err, domain.ErrUserAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, domain.ErrIdempotencyConflict):
-		return status.Error(codes.AlreadyExists, err.Error()) // grpc-gateway маппит на HTTP 409
+		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrAccessDenied):

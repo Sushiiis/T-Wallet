@@ -1,4 +1,3 @@
-// internal/transport/grpc/metrics_interceptor.go
 package grpcserver
 
 import (
@@ -11,7 +10,6 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/observability"
 )
 
-// NewMetricsInterceptor пишет счётчик запросов и гистограмму латентности в Prometheus.
 func NewMetricsInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()

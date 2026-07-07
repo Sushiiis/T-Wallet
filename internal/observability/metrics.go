@@ -1,4 +1,3 @@
-// internal/observability/metrics.go
 package observability
 
 import (
@@ -26,7 +25,6 @@ var (
 	})
 )
 
-// ObserveRequest — вспомогательная функция для интерсептора.
 func ObserveRequest(method, code string, duration time.Duration) {
 	RequestsTotal.WithLabelValues(method, code).Inc()
 	RequestDuration.WithLabelValues(method).Observe(duration.Seconds())

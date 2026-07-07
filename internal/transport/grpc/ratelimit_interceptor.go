@@ -1,4 +1,3 @@
-// internal/transport/grpc/ratelimit_interceptor.go
 package grpcserver
 
 import (
@@ -12,7 +11,6 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/ratelimit"
 )
 
-// Денежные операции — единственные, где имеет смысл лимитировать нагрузку.
 var rateLimitedMethods = map[string]bool{
 	"/wallet.v1.WalletService/Deposit":  true,
 	"/wallet.v1.WalletService/Withdraw": true,
@@ -27,14 +25,11 @@ func NewRateLimitInterceptor(limiter *ratelimit.Limiter) grpc.UnaryServerInterce
 
 		userID, ok := auth.UserIDFromContext(ctx)
 		if !ok {
-			// К этому моменту auth-интерсептор уже должен был отклонить запрос без токена.
 			return handler(ctx, req)
 		}
 
 		allowed, err := limiter.Allow(ctx, userID.String())
 		if err != nil {
-			// Redis недоступен — не блокируем деньги из-за инфраструктурной проблемы,
-			// но это стоит компенсировать алертом в проде (за рамками пет-проекта).
 			return handler(ctx, req)
 		}
 		if !allowed {

@@ -1,4 +1,3 @@
-// internal/repository/postgres/wallet.go
 package postgres
 
 import (
@@ -80,8 +79,6 @@ func (r *WalletRepo) singleEntry(
 		return domain.Transaction{}, err
 	}
 	if existingTxnID != nil {
-		// Ключ уже был использован с тем же телом запроса — просто
-		// возвращаем результат прежней операции, ничего не выполняя повторно.
 		txn, err := getTransactionByID(ctx, tx, *existingTxnID)
 		if err != nil {
 			return domain.Transaction{}, err
@@ -149,8 +146,6 @@ func (r *WalletRepo) Transfer(ctx context.Context, fromID, toID uuid.UUID, amoun
 		return txn, tx.Commit(ctx)
 	}
 
-	// Блокируем счета в детерминированном порядке (по возрастанию id),
-	// чтобы переводы A->B и B->A не поймали дедлок.
 	firstID, secondID := fromID, toID
 	if bytes.Compare(fromID[:], toID[:]) > 0 {
 		firstID, secondID = toID, fromID
@@ -232,18 +227,6 @@ func insertOutboxEvent(ctx context.Context, tx pgx.Tx, txn domain.Transaction) e
 	return nil
 }
 
-// claimIdempotencyKey атомарно "застолбляет" ключ внутри транзакции.
-//
-// Возвращает (nil, nil), если ключ свободен — вызывающий код должен выполнить операцию.
-// Возвращает (&transactionID, nil), если ключ уже использовался с тем же телом
-// запроса — вызывающий код должен вернуть результат прежней операции.
-// Возвращает (nil, domain.ErrIdempotencyConflict), если ключ использовался с
-// другим телом запроса.
-//
-// Безопасность при гонке: под Read Committed конкурентный INSERT с тем же
-// PRIMARY KEY блокируется до завершения первой транзакции. Если та закоммитилась,
-// наш INSERT ... ON CONFLICT DO NOTHING гарантированно видит уже закоммиченную
-// строку — поэтому последующий SELECT ниже никогда не увидит "чужую" гонку.
 func claimIdempotencyKey(ctx context.Context, tx pgx.Tx, key, reqHash string) (*uuid.UUID, error) {
 	tag, err := tx.Exec(ctx,
 		`INSERT INTO idempotency_keys (key, request_hash) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
@@ -268,15 +251,11 @@ func claimIdempotencyKey(ctx context.Context, tx pgx.Tx, key, reqHash string) (*
 		return nil, domain.ErrIdempotencyConflict
 	}
 	if existingTxnID == nil {
-		// Практически недостижимо: transaction_id проставляется в той же
-		// транзакции, что и коммит claim'а. Оставлено как защита от гонки,
-		// которую мы не предусмотрели.
 		return nil, fmt.Errorf("idempotency key %q claimed but has no transaction yet, retry", key)
 	}
 	return existingTxnID, nil
 }
 
-// attachIdempotencyKey привязывает успешно выполненную операцию к её ключу.
 func attachIdempotencyKey(ctx context.Context, tx pgx.Tx, key string, txnID uuid.UUID) error {
 	_, err := tx.Exec(ctx,
 		`UPDATE idempotency_keys SET transaction_id = $1 WHERE key = $2`, txnID, key,

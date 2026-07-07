@@ -1,4 +1,3 @@
-// internal/usecase/wallet.go
 package usecase
 
 import (
@@ -15,7 +14,7 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/auth"
 )
 
-// --- интерфейсы (реализация — internal/repository/postgres) ---
+// --- интерфейсы internal/repository/postgres ---
 
 type UserRepository interface {
 	Create(ctx context.Context, email, passwordHash string) (domain.User, error)
@@ -144,14 +143,11 @@ func (w *Wallet) ownedAccount(ctx context.Context, accountID uuid.UUID) (domain.
 	return acc, nil
 }
 
-// requestHash — детерминированный отпечаток тела запроса. Используется, чтобы
-// отличить "тот же Idempotency-Key, тот же запрос" (безопасный повтор) от
-// "тот же ключ, но другое тело" (ошибка клиента, см. ТЗ п.6.1).
 func requestHash(parts ...string) string {
 	h := sha256.New()
 	for _, p := range parts {
 		h.Write([]byte(p))
-		h.Write([]byte{0}) // разделитель, чтобы "12"+"3" не совпало с "1"+"23"
+		h.Write([]byte{0}) // разделитель
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

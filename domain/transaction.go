@@ -1,4 +1,3 @@
-// domain/transaction.go
 package domain
 
 import (

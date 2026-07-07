@@ -1,4 +1,3 @@
-// internal/observability/logging.go
 package observability
 
 import (
@@ -8,8 +7,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// TraceHandler оборачивает slog.Handler, добавляя trace_id/span_id из
-// активного OTel-спана в каждую запись лога — так по логу можно перейти в Jaeger.
 type TraceHandler struct {
 	slog.Handler
 }

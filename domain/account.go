@@ -1,4 +1,3 @@
-// domain/account.go
 package domain
 
 import (
@@ -11,6 +10,6 @@ type Account struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
 	Currency  string
-	Balance   int64 // в копейках
+	Balance   int64
 	CreatedAt time.Time
 }

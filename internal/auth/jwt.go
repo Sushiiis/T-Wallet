@@ -1,4 +1,3 @@
-// internal/auth/jwt.go
 package auth
 
 import (
@@ -21,7 +20,6 @@ func NewManager(secret string, ttl time.Duration) *Manager {
 	return &Manager{secret: []byte(secret), ttl: ttl}
 }
 
-// Generate выпускает подписанный access-токен.
 func (m *Manager) Generate(userID uuid.UUID) (string, error) {
 	now := time.Now()
 	claims := jwt.RegisteredClaims{
@@ -37,7 +35,6 @@ func (m *Manager) Generate(userID uuid.UUID) (string, error) {
 	return signed, nil
 }
 
-// Parse валидирует токен и возвращает ID пользователя.
 func (m *Manager) Parse(tokenString string) (uuid.UUID, error) {
 	var claims jwt.RegisteredClaims
 	_, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (any, error) {

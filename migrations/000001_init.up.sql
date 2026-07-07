@@ -1,5 +1,3 @@
--- migrations/000001_init.up.sql
--- gen_random_uuid() входит в ядро PostgreSQL 13+, расширение не нужно.
 
 CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,14 +10,14 @@ CREATE TABLE accounts (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID NOT NULL REFERENCES users(id),
     currency   TEXT NOT NULL DEFAULT 'RUB',
-    balance    BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0), -- в копейках
+    balance    BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE transactions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type            TEXT NOT NULL,   -- deposit | withdraw | transfer
-    status          TEXT NOT NULL,   -- completed | failed
+    type            TEXT NOT NULL,   -- deposit / withdraw / transfer
+    status          TEXT NOT NULL,   -- completed / failed
     amount          BIGINT NOT NULL CHECK (amount > 0),
     from_account_id UUID REFERENCES accounts(id),
     to_account_id   UUID REFERENCES accounts(id),

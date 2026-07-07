@@ -1,4 +1,3 @@
-// cmd/notifier/main.go
 package main
 
 import (

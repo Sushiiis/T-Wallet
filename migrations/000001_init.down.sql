@@ -1,4 +1,3 @@
--- migrations/000001_init.down.sql
 DROP TABLE IF EXISTS outbox;
 DROP TABLE IF EXISTS idempotency_keys;
 DROP TABLE IF EXISTS ledger_entries;

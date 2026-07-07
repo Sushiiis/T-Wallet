@@ -1,4 +1,3 @@
-// internal/transport/http/server.go
 package httpserver
 
 import (
@@ -10,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// New строит HTTP-сервер: liveness/readiness напрямую, всё остальное — в REST-шлюз.
+// Cтроит сервер: liveness/readiness, всё остальное — в REST-шлюз.
 func New(ctx context.Context, addr string, pool *pgxpool.Pool, grpcEndpoint string) (*http.Server, error) {
 	gateway, err := NewGatewayMux(ctx, grpcEndpoint)
 	if err != nil {
@@ -38,6 +37,7 @@ func New(ctx context.Context, addr string, pool *pgxpool.Pool, grpcEndpoint stri
 	})
 
 	// Всё остальное (/v1/...) — в grpc-gateway.
+	// Проверить
 	mux.Handle("/v1/", gateway)
 
 	return &http.Server{

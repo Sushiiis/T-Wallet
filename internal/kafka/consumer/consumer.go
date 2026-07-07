@@ -1,4 +1,3 @@
-// internal/kafka/consumer/consumer.go
 package consumer
 
 import (
@@ -35,7 +34,6 @@ func New(brokers []string, topic, groupID string, repo NotificationRepository, l
 	return &Consumer{reader: reader, repo: repo, logger: logger}
 }
 
-// Run блокирует вызывающего до отмены ctx или фатальной ошибки чтения.
 func (c *Consumer) Run(ctx context.Context) error {
 	defer c.reader.Close()
 
@@ -49,8 +47,6 @@ func (c *Consumer) Run(ctx context.Context) error {
 		}
 
 		if err := c.handle(ctx, msg); err != nil {
-			// Не коммитим оффсет — сообщение будет доставлено повторно.
-			// Обработчик идемпотентен (см. NotificationRepository.Create), это безопасно.
 			c.logger.Error("notifier: ошибка обработки сообщения", "error", err)
 			continue
 		}

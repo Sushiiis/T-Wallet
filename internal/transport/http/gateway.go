@@ -1,4 +1,3 @@
-// internal/transport/http/gateway.go
 package httpserver
 
 import (
@@ -14,7 +13,7 @@ import (
 )
 
 // idempotencyHeaderMatcher добавляет проброс "Idempotency-Key" к дефолтным
-// правилам grpc-gateway (Authorization пробрасывается всегда и без этого).
+// правилам grpc-gateway.
 func idempotencyHeaderMatcher(key string) (string, bool) {
 	switch key {
 	case "Idempotency-Key":
@@ -25,7 +24,7 @@ func idempotencyHeaderMatcher(key string) (string, bool) {
 }
 
 // NewGatewayMux строит REST-шлюз (grpc-gateway), проксирующий JSON HTTP
-// на локальный gRPC-сервер по grpcEndpoint (например, "localhost:50051").
+// на локальный gRPC-сервер по grpcEndpoint.
 func NewGatewayMux(ctx context.Context, grpcEndpoint string) (http.Handler, error) {
 	mux := runtime.NewServeMux(
 		runtime.WithIncomingHeaderMatcher(idempotencyHeaderMatcher),

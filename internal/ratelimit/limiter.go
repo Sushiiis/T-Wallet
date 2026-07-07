@@ -1,4 +1,3 @@
-// internal/ratelimit/limiter.go
 package ratelimit
 
 import (
@@ -9,8 +8,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Limiter — простой fixed-window rate limiter поверх Redis.
-// INCR атомарен, поэтому гонки между параллельными запросами исключены.
 type Limiter struct {
 	rdb    *redis.Client
 	limit  int64
@@ -21,8 +18,6 @@ func New(rdb *redis.Client, limit int64, window time.Duration) *Limiter {
 	return &Limiter{rdb: rdb, limit: limit, window: window}
 }
 
-// Allow возвращает true, если запрос укладывается в лимит для данного key
-// (обычно — user_id или account_id) в текущем временном окне.
 func (l *Limiter) Allow(ctx context.Context, key string) (bool, error) {
 	windowID := time.Now().Unix() / int64(l.window.Seconds())
 	redisKey := fmt.Sprintf("ratelimit:%s:%d", key, windowID)
@@ -32,7 +27,6 @@ func (l *Limiter) Allow(ctx context.Context, key string) (bool, error) {
 		return false, fmt.Errorf("incr rate limit key: %w", err)
 	}
 	if count == 1 {
-		// Ключ только что создан этим вызовом — выставляем TTL на окно.
 		if err := l.rdb.Expire(ctx, redisKey, l.window).Err(); err != nil {
 			return false, fmt.Errorf("expire rate limit key: %w", err)
 		}

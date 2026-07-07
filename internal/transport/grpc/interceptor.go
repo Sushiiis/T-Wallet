@@ -19,11 +19,8 @@ var publicMethods = map[string]bool{
 	"/wallet.v1.WalletService/Login":    true,
 }
 
-// NewAuthInterceptor валидирует JWT и кладёт user_id в контекст.
 func NewAuthInterceptor(tokens *auth.Manager) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		// Аутентификация только для методов кошелька, кроме Register/Login.
-		// health/reflection проходят мимо.
 		if !strings.HasPrefix(info.FullMethod, "/wallet.v1.WalletService/") || publicMethods[info.FullMethod] {
 			return handler(ctx, req)
 		}

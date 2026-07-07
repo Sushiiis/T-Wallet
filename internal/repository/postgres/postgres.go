@@ -1,4 +1,3 @@
-// internal/repository/postgres/postgres.go
 package postgres
 
 import (
@@ -11,7 +10,6 @@ import (
 	pgxuuid "github.com/vgarvardt/pgx-google-uuid/v5"
 )
 
-// New создаёт пул pgx, регистрирует google/uuid и проверяет связь пингом.
 func New(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -22,7 +20,6 @@ func New(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	cfg.MaxConnLifetime = time.Hour
 	cfg.MaxConnIdleTime = 30 * time.Minute
 
-	// pgx v5 не знает про google/uuid — регистрируем адаптер на каждом соединении.
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxuuid.Register(conn.TypeMap())
 		return nil

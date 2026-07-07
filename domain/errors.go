@@ -1,4 +1,3 @@
-// domain/errors.go
 package domain
 
 import "errors"

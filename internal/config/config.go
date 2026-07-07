@@ -54,7 +54,6 @@ type RedisConfig struct {
 	Addr string
 }
 
-// DSN собирает строку подключения к PostgreSQL в URL-формате.
 func (p PostgresConfig) DSN() string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
@@ -62,7 +61,6 @@ func (p PostgresConfig) DSN() string {
 	)
 }
 
-// Load читает конфигурацию из переменных окружения.
 func Load() (*Config, error) {
 	var missing []string
 	req := func(key string) string {

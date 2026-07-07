@@ -1,4 +1,3 @@
-// internal/observability/tracing.go
 package observability
 
 import (
@@ -15,9 +14,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// InitTracer настраивает глобальный TracerProvider с OTLP/gRPC-экспортом.
-// Jaeger >= 1.35 (используем v2) принимает OTLP нативно на порту 4317 —
-// отдельный "jaeger exporter" в otel-go не поддерживается с июля 2023.
 func InitTracer(ctx context.Context, endpoint, serviceName string) (func(context.Context) error, error) {
 	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

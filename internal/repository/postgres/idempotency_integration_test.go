@@ -1,6 +1,3 @@
-// internal/repository/postgres/notification_integration_test.go
-//go:build integration
-
 package postgres_test
 
 import (
@@ -38,7 +35,6 @@ func TestNotificationRepo_Create_DuplicateTransactionID_Idempotent(t *testing.T)
 	require.NoError(t, err)
 	defer pool.Close()
 
-	// FK на transactions(id) — минимальная валидная запись для теста.
 	userID := uuid.New()
 	_, err = pool.Exec(ctx, `INSERT INTO users (id, email, password_hash) VALUES ($1,$2,$3)`,
 		userID, "notif@test.com", "hash")
@@ -51,12 +47,10 @@ func TestNotificationRepo_Create_DuplicateTransactionID_Idempotent(t *testing.T)
 
 	repo := postgres.NewNotificationRepo(pool)
 
-	// Первая доставка события — уведомление создаётся.
 	inserted1, err := repo.Create(ctx, txnID, []byte(`{"type":"deposit"}`))
 	require.NoError(t, err)
 	require.True(t, inserted1)
 
-	// Повторная доставка того же события (at-least-once от Kafka) — идемпотентна.
 	inserted2, err := repo.Create(ctx, txnID, []byte(`{"type":"deposit"}`))
 	require.NoError(t, err)
 	require.False(t, inserted2, "повторная доставка не должна создавать вторую запись")

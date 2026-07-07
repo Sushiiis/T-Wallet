@@ -1,10 +1,7 @@
-// internal/kafka/event.go
 package kafka
 
 import "time"
 
-// TransactionCompletedEvent — payload события, которое relay публикует в Kafka
-// и которое консьюмер notifier'а десериализует обратно.
 type TransactionCompletedEvent struct {
 	TransactionID string    `json:"transaction_id"`
 	Type          string    `json:"type"`

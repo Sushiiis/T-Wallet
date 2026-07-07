@@ -1,4 +1,3 @@
-# observability/grafana/provisioning/datasources/prometheus.yml
 apiVersion: 1
 datasources:
   - name: Prometheus

@@ -1,6 +1,3 @@
-// internal/repository/postgres/concurrency_integration_test.go
-//go:build integration
-
 package postgres_test
 
 import (
@@ -17,9 +14,6 @@ import (
 	"github.com/Sushiiis/T-Wallet/internal/repository/postgres"
 )
 
-// TestWalletRepo_ConcurrentTransfers_NoNegativeBalance_NoLostMoney — тест
-// "на собеседование-эффект" из ТЗ: 100 параллельных переводов между двумя
-// счетами не должны увести баланс в минус и не должны "потерять" деньги.
 func TestWalletRepo_ConcurrentTransfers_NoNegativeBalance_NoLostMoney(t *testing.T) {
 	ctx := context.Background()
 
@@ -69,9 +63,6 @@ func TestWalletRepo_ConcurrentTransfers_NoNegativeBalance_NoLostMoney(t *testing
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			// Половина переводит A->B, половина B->A — специально бьём в обе
-			// стороны, чтобы задействовать и проверить порядок блокировок
-			// (см. bytes.Compare в Transfer), а не только один путь.
 			from, to := accA.ID, accB.ID
 			if i%2 == 1 {
 				from, to = accB.ID, accA.ID

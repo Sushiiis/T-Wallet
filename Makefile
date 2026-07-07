@@ -1,4 +1,3 @@
-# Makefile
 ENV_FILE := .env
 COMPOSE  := docker compose --env-file $(ENV_FILE) -f deployments/docker-compose.yml
 
